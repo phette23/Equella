@@ -21,6 +21,7 @@ import java.util.List;
 import javax.inject.Inject;
 
 import com.tle.web.sections.events.RespondingListener;
+import com.tle.web.wizard.WizardStateInterface;
 import org.java.plugin.registry.Extension;
 
 import com.dytech.edge.wizard.WizardException;
@@ -154,16 +155,16 @@ public class RootWizardSection extends TwoColumnLayout<WizardForm>
 		}
 
 		final DefaultWizardSectionInfo winfo = infoProvider.get();
+		winfo.setWizardState(state);
 		info.setAttribute(WizardSectionInfo.class, winfo);
 		info.setAttribute(ItemSectionInfo.class, winfo);
-		winfo.setWizardState(state);
+		info.setAttribute(WizardStateInterface.class, state);
 
 		List<WizardStateListener> listeners = stateListeners.getAllImplementors(info);
 		for( WizardStateListener stateListener : listeners )
 		{
 			stateListener.handleWizardState(info, state);
 		}
-		// FIXME: save here??
 	}
 
 	@Override
@@ -289,8 +290,7 @@ public class RootWizardSection extends TwoColumnLayout<WizardForm>
 		}
 
 		context.getForm().setName("WizardForm");
-		final WizardSectionInfo winfo = getWizardInfo(context);
-		final WizardState state = winfo.getWizardState();
+
 		return super.renderHtml(context);
 	}
 
