@@ -1,23 +1,23 @@
-import { Button, FormControl, FormControlLabel, FormGroup, FormHelperText, Grid, Input, Paper, InputLabel, MenuItem, Switch, Tab, Tabs, TextField, Theme } from '@material-ui/core';
+import { Button, FormControl, FormControlLabel, FormGroup, FormHelperText, Grid, Input, InputLabel, MenuItem, Paper, Switch, Tab, Tabs, TextField, Theme } from '@material-ui/core';
 import Select from '@material-ui/core/Select';
 import { StyleRules, WithStyles, withStyles } from '@material-ui/core/styles';
+import { DateTime } from 'luxon';
 //import SwipeableViews from 'react-swipeable-views';
 import { DatePicker } from 'material-ui-pickers';
 import * as React from 'react';
-import { Dispatch, connect } from 'react-redux';
+import { connect, Dispatch } from 'react-redux';
 import courseService from '.';
 import aclService from '../acl/index';
 import { Course } from '../api';
 import { AclEditorChangeEvent, TargetListEntry } from '../api/acleditor';
 import { Error, Loader } from '../components/index';
+import MessageInfo from '../components/MessageInfo';
 import { EditEntityDispatchProps, EditEntityProps, EditEntityStateProps, entityStrings } from '../entity';
 import schemaService from '../schema/index';
 import { StoreState } from '../store';
 import { commonString } from '../util/commonstrings';
 import { properties } from '../util/dictionary';
 import { prepLangStrings } from '../util/langstrings';
-import MessageInfo from '../components/MessageInfo';
-import { DateTime } from 'luxon';
 
 const styles = (theme: Theme) => {
     //TODO: get drawerWidth passed in somehow
@@ -47,10 +47,10 @@ const styles = (theme: Theme) => {
         },
         footerActions: {
             padding: '4px',
-            paddingRight: '20px', 
-            display: "flex", 
+            paddingRight: '20px',
+            display: "flex",
             justifyContent: "flex-end"
-        }, 
+        },
         hiddenTab: {
             display: "none"
         }
@@ -64,13 +64,13 @@ interface EditCourseStateProps extends EditEntityStateProps<Course> {
 
 interface EditCourseDispatchProps extends EditEntityDispatchProps<Course> {
     loadCitations: () => Promise<string[]>;
-    listPrivileges: (node: string) => Promise<{node: string, result: string[]}>;
+    listPrivileges: (node: string) => Promise<{ node: string, result: string[] }>;
 }
 
 interface EditCourseProps extends EditEntityProps<Course>, EditCourseStateProps, EditCourseDispatchProps {
 }
 
-type Props = EditCourseProps & 
+type Props = EditCourseProps &
     WithStyles<'hiddenTab' | 'body' | 'formControl' | 'formControl2' | 'form' | 'footerActions' | 'footer'>;
 
 interface EditCourseState {
@@ -90,34 +90,34 @@ export const strings = prepLangStrings("courseedit",
         name: {
             label: "Name",
             help: "Course name, e.g. Advanced EQUELLA studies"
-        }, 
+        },
         description:
         {
             label: "Description",
             help: "A brief description"
-        }, 
+        },
         code: {
             label: "Code",
             help: "Course code, e.g. EQ101"
-        }, 
+        },
         type: {
             label: "Course Type",
-            i: "Internal" ,
+            i: "Internal",
             e: "External",
             s: "Staff"
-        }, 
+        },
         department: {
             label: "Department Name"
-        }, 
+        },
         citation: {
             label: "Citation"
-        }, 
+        },
         startdate: {
-            label: "Start Date" 
-        }, 
+            label: "Start Date"
+        },
         enddate: {
             label: "End Date"
-        }, 
+        },
         version: {
             label: "Version Selection",
             default: "Institution default",
@@ -129,11 +129,11 @@ export const strings = prepLangStrings("courseedit",
         },
         students: {
             label: "Unique Individuals"
-        }, 
+        },
         archived: {
             label: "Archived"
         },
-        saved: "Successfully saved", 
+        saved: "Successfully saved",
         errored: "Save failed due to server error"
     }
 );
@@ -141,28 +141,26 @@ export const strings = prepLangStrings("courseedit",
 
 class EditCourse extends React.Component<Props, EditCourseState> {
 
-    constructor(props: Props){
+    constructor(props: Props) {
         super(props);
 
         this.state = {
             activeTab: 0,
             canSave: true,
-            changed: false, 
+            changed: false,
             justSaved: false,
             errored: false,
             editing: this.props.uuid ? true : false
         };
-        if (this.props.uuid)
-        {
+        if (this.props.uuid) {
             this.props.loadEntity(this.props.uuid);
         }
-        else 
-        {
+        else {
             this.props.modifyEntity({
                 code: '',
-                name: '', 
-                description: '', 
-                type: 'Internal', 
+                name: '',
+                description: '',
+                type: 'Internal',
                 versionSelection: 'INSTITUTION_DEFAULT'
             });
         }
@@ -171,36 +169,46 @@ class EditCourse extends React.Component<Props, EditCourseState> {
     }
 
     modifyEntity = (c: Partial<Course>) => {
-        if (this.props.entity)
-        {
-            this.props.modifyEntity({...this.props.entity, ...c});
-            this.setState({changed:true});
+        if (this.props.entity) {
+            this.props.modifyEntity({ ...this.props.entity, ...c });
+            this.setState({ changed: true });
         }
     }
 
     handleSave() {
-        if (this.props.entity)
-        {
+        if (this.props.entity) {
             const { versionSelection } = this.props.entity;
+            const { router, routes } = this.props.bridge;
             const vs = (versionSelection === "DEFAULT" ? undefined : versionSelection);
-            
+
             let course = {
                 ...this.props.entity,
                 versionSelection: vs,
-                security: this.state.editSecurity ? {rules: this.state.editSecurity()} : this.props.entity.security
+                security: this.state.editSecurity ? { rules: this.state.editSecurity() } : this.props.entity.security
             };
-            
+
             const { saveEntity } = this.props;
             const thiss = this;
-            this.props.validateEntity(course).then(function(valErrors){
-                if (properties(valErrors).length === 0){
+            this.props.validateEntity(course).then(function (valErrors) {
+                if (properties(valErrors).length === 0) {
                     saveEntity(course)
-                    .then(_ => thiss.setState({changed:false, justSaved: true}))
-                    .catch(r => thiss.setState({errored: true}))
+                        .then(editedCourse => {
+                            // change the URL, but only if it's new
+                            if (!thiss.props.uuid) {
+                                // FIXME: remove the unload event listener
+                                //window.removeEventListener('beforeunload');
+                                const uuid = editedCourse.result.uuid;
+                                const courseEditRoute = router(routes.CourseEdit(uuid));
+                                window.location.href = courseEditRoute.href;
+                            }
+                            else {
+                                thiss.setState({ changed: false, justSaved: true });
+                            }
+                        })
+                        .catch(r => thiss.setState({ errored: true }))
                 }
-                else 
-                {
-                    thiss.setState({activeTab: 0})
+                else {
+                    thiss.setState({ activeTab: 0 })
                 }
             });
         }
@@ -208,7 +216,7 @@ class EditCourse extends React.Component<Props, EditCourseState> {
 
     handleChange(stateFieldName: string): (event: React.ChangeEvent<any>) => void {
         return (event: React.ChangeEvent<any>) => {
-            this.modifyEntity({ [stateFieldName]: event.target.value });            
+            this.modifyEntity({ [stateFieldName]: event.target.value });
         };
     }
 
@@ -216,10 +224,10 @@ class EditCourse extends React.Component<Props, EditCourseState> {
         return (event: React.ChangeEvent<any>) => {
             let val = event.target.value;
             let intVal: number | undefined = parseInt(val);
-            if (!Number.isInteger(intVal)){
+            if (!Number.isInteger(intVal)) {
                 intVal = undefined;
             }
-            this.modifyEntity({ [stateFieldName]: intVal });   
+            this.modifyEntity({ [stateFieldName]: intVal });
         };
     }
 
@@ -231,7 +239,7 @@ class EditCourse extends React.Component<Props, EditCourseState> {
 
     handleDateChange(stateFieldName: string): (date?: DateTime) => void {
         return (date?: DateTime) => {
-            this.modifyEntity({ [stateFieldName]: date ? date.toISO() : null});
+            this.modifyEntity({ [stateFieldName]: date ? date.toISO() : null });
         };
     }
 
@@ -261,19 +269,19 @@ class EditCourse extends React.Component<Props, EditCourseState> {
         const versionval = strings.version;
         const title = sprintf(editing ? strings.title : strings.newtitle, entity ? entity.name : "");
 
-        if (loading || !citations || !availablePrivileges){
+        if (loading || !citations || !availablePrivileges) {
             return <Template title={title} backRoute={routes.CoursesPage}>
-                    <Loader />
-                </Template>
+                <Loader />
+            </Template>
         }
 
-        if (!entity){
+        if (!entity) {
             return <Template title={title} backRoute={routes.CoursesPage}>
-                    <Error>Error loading entity</Error>
-                </Template>
+                <Error>Error loading entity</Error>
+            </Template>
         }
 
-        const { code, name, description, type, departmentName, citation, students, from, 
+        const { code, name, description, type, departmentName, citation, students, from,
             until, versionSelection, archived, security, validationErrors } = entity;
         const { activeTab, changed, canSave, justSaved, errored } = this.state;
         const vs = (versionSelection ? versionSelection : "DEFAULT");
@@ -282,72 +290,72 @@ class EditCourse extends React.Component<Props, EditCourseState> {
         const val = validationErrors || {};
 
         let rules: TargetListEntry[] = [];
-        if (security){
+        if (security) {
             rules = security!.rules;
-        } 
+        }
 
-        const saveOrCancel = 
+        const saveOrCancel =
             <Paper className={classes.footerActions}>
                 <Button onClick={router(routes.CoursesPage).onClick} color="secondary">{commonString.action.cancel}</Button>
                 <Button onClick={this.handleSave.bind(this)} color="primary"
                     disabled={!canSave || !changed}>{commonString.action.save}</Button>
-            </Paper>               
+            </Paper>
 
-        return <Template title={title} preventNavigation={changed} 
-                fixedViewPort={true} 
-                backRoute={routes.CoursesPage} 
-                footer={saveOrCancel} 
-                tabs={
-                    <Tabs value={activeTab} onChange={this.handleTabChange()} fullWidth>
-                        <Tab label={strings.tab} />
-                        <Tab label={entityStrings.edit.tab.permissions} />
-                    </Tabs>
-                } >
-            <MessageInfo title={strings.saved} open={justSaved} 
-                onClose={() => this.setState({justSaved:false})} variant="success"/>
-            <MessageInfo title={strings.errored} open={errored} 
-                onClose={() => this.setState({errored:false})} variant="error"/>
+        return <Template title={title} preventNavigation={changed}
+            fixedViewPort={true}
+            backRoute={routes.CoursesPage}
+            footer={saveOrCancel}
+            tabs={
+                <Tabs value={activeTab} onChange={this.handleTabChange()} fullWidth>
+                    <Tab label={strings.tab} />
+                    <Tab label={entityStrings.edit.tab.permissions} />
+                </Tabs>
+            } >
+            <MessageInfo title={strings.saved} open={justSaved}
+                onClose={() => this.setState({ justSaved: false })} variant="success" />
+            <MessageInfo title={strings.errored} open={errored}
+                onClose={() => this.setState({ errored: false })} variant="error" />
             <div className={classes.body}>
                 <div className={this.state.activeTab === 0 ? "" : classes.hiddenTab}>
                     <Grid>
                         <div className={classes.form}>
 
-                            <TextField id="name" 
+                            <TextField id="name"
                                 label={strings.name.label}
-                                helperText={strings.name.help} 
+                                helperText={strings.name.help}
                                 value={name || ''}
                                 onChange={this.handleChange('name')}
                                 margin="normal"
                                 className={classes.formControl2}
                                 required
                                 error={(val['name'] ? true : false)}
-                                />
+                            />
 
-                            <TextField id="description" 
-                                label={strings.description.label} 
-                                helperText={strings.description.help} 
+                            <TextField id="description"
+                                label={strings.description.label}
+                                helperText={strings.description.help}
                                 value={description || ''}
                                 onChange={this.handleChange('description')}
                                 multiline
                                 rows={2}
                                 margin="normal"
                                 className={classes.formControl2}
-                                />
+                            />
 
-                            <TextField id="code" 
-                                label={strings.code.label} 
-                                helperText={strings.code.help} 
+                            <TextField id="code"
+                                label={strings.code.label}
+                                helperText={strings.code.help}
                                 value={code}
                                 onChange={this.handleChange('code')}
                                 margin="normal"
                                 className={classes.formControl}
                                 required
                                 error={(val['code'] ? true : false)}
-                                    />
+                            />
 
                             <FormControl margin="normal" className={classes.formControl}>
                                 <InputLabel htmlFor="type">{strings.type.label}</InputLabel>
-                                <Select id="type" 
+                                <Select id="type"
                                     value={type}
                                     input={<Input id="type-inp" />}
                                     onChange={this.handleChange('type')}
@@ -358,57 +366,57 @@ class EditCourse extends React.Component<Props, EditCourseState> {
                                 </Select>
                             </FormControl>
 
-                            <TextField id="departmentName" 
+                            <TextField id="departmentName"
                                 label={strings.department.label}
                                 //helperText=""
                                 value={departmentName || ''}
                                 onChange={this.handleChange('departmentName')}
                                 margin="normal"
                                 className={classes.formControl}
-                                />
+                            />
 
                             <FormControl margin="normal" className={classes.formControl}>
                                 <InputLabel htmlFor="citation">{strings.citation.label}</InputLabel>
-                                <Select id="citation" 
+                                <Select id="citation"
                                     value={citation || ''}
                                     input={<Input id="citation-inp" />}
                                     onChange={this.handleChange('citation')}
                                 >
                                     {citations.map((citation) =>
-                                    <MenuItem key={citation} value={citation}>
-                                        {citation}
-                                    </MenuItem>
+                                        <MenuItem key={citation} value={citation}>
+                                            {citation}
+                                        </MenuItem>
                                     )}
                                 </Select>
                             </FormControl>
 
                             <DatePicker id="from"
-                                label={strings.startdate.label} 
+                                label={strings.startdate.label}
                                 // format="MMMM Do YYYY"
                                 value={fromDate}
                                 onChange={this.handleDateChange('from')}
-                                clearable 
+                                clearable
                                 margin="normal"
                                 className={classes.formControl}
-                                />
-                            
+                            />
+
                             <DatePicker id="until"
-                                label={strings.enddate.label} 
+                                label={strings.enddate.label}
                                 // format="MMMM Do YYYY"
                                 value={untilDate}
                                 onChange={this.handleDateChange('until')}
                                 clearable
                                 margin="normal"
                                 className={classes.formControl}
-                                />
-                            
+                            />
+
                             <FormControl margin="normal" className={classes.formControl}>
                                 <InputLabel htmlFor="versionSelection">{strings.version.label}</InputLabel>
-                                <Select id="versionSelection" 
+                                <Select id="versionSelection"
                                     value={vs}
                                     input={<Input id="versionSelection-inp" />}
                                     onChange={this.handleChange('versionSelection')}
-                                    
+
                                 >
                                     <MenuItem key={"DEFAULT"} value={"INSTITUTION_DEFAULT"}>{versionval.default}</MenuItem>
                                     <MenuItem key={"FORCE_LATEST"} value={"FORCE_LATEST"}>{versionval.forcelatest}</MenuItem>
@@ -419,16 +427,16 @@ class EditCourse extends React.Component<Props, EditCourseState> {
                                 <FormHelperText>{strings.version.help}</FormHelperText>
                             </FormControl>
 
-                            <TextField id="students" 
+                            <TextField id="students"
                                 label={strings.students.label}
                                 //helperText=""
-                                value={students||' '}
+                                value={students || ' '}
                                 onInput={this.handleIntChange('students')}
                                 margin="normal"
                                 className={classes.formControl}
                                 type="number"
                                 error={(val['students'] ? true : false)}
-                                />
+                            />
 
                             <FormGroup className={classes.formControl}>
                                 <FormControlLabel
@@ -444,14 +452,14 @@ class EditCourse extends React.Component<Props, EditCourseState> {
                     </Grid>
                 </div>
 
-                <div className={this.state.activeTab === 1 ? "" : classes.hiddenTab } style={{ height: "100%" }}>
-                    { /* TODO: priv list from API */ }
-                    <AclEditor 
-                        onChange={ this.handleAclChange() }
-                        acls={rules} 
-                        allowedPrivs={availablePrivileges}/>
+                <div className={this.state.activeTab === 1 ? "" : classes.hiddenTab} style={{ height: "100%" }}>
+                    { /* TODO: priv list from API */}
+                    <AclEditor
+                        onChange={this.handleAclChange()}
+                        acls={rules}
+                        allowedPrivs={availablePrivileges} />
                 </div>
-                <div className={classes.footer}/>
+                <div className={classes.footer} />
             </div>
 
         </Template>
@@ -470,13 +478,13 @@ function mapStateToProps(state: StoreState): EditCourseStateProps {
 
 function mapDispatchToProps(dispatch: Dispatch<any>): EditCourseDispatchProps {
     const { workers, actions } = courseService;
-    
+
     return {
-        loadEntity: (uuid: string) => workers.read(dispatch, {uuid}),
-        saveEntity: (entity: Course) => workers.update(dispatch, {entity}),
-        modifyEntity: (entity: Course) => dispatch(actions.modify({entity: entity})),
+        loadEntity: (uuid: string) => workers.read(dispatch, { uuid }),
+        saveEntity: (entity: Course) => workers.update(dispatch, { entity }),
+        modifyEntity: (entity: Course) => dispatch(actions.modify({ entity: entity })),
         loadCitations: () => schemaService.workers.citations(dispatch, {}),
-        listPrivileges: (node: string) => aclService.workers.listPrivileges(dispatch, {node}),
+        listPrivileges: (node: string) => aclService.workers.listPrivileges(dispatch, { node }),
         validateEntity: (entity: Course) => workers.validate(dispatch, { entity })
     };
 }

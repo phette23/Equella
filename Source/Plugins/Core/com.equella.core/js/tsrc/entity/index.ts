@@ -2,8 +2,8 @@ import axios from 'axios';
 import { Dispatch } from 'redux';
 import { Action, ActionCreator, AsyncActionCreators } from 'typescript-fsa';
 import { ReducerBuilder, reducerWithInitialState } from "typescript-fsa-reducers";
-import { Entity } from '../api/Entity';
 import { Bridge } from '../api/bridge';
+import { Entity } from '../api/Entity';
 import { Config } from '../config';
 import { actionCreator, wrapAsyncWorker } from '../util/actionutil';
 import { IDictionary } from '../util/dictionary';
@@ -123,13 +123,17 @@ function entityWorkers<E extends Entity>(entityCrudActions: EntityCrudActions<E>
             // FIXME: edit a specific locale:
             const postEntity = Object.assign({}, entity, { nameStrings: { en: entity.name }, descriptionStrings: {en: entity.description } });
             if (entity.uuid){
-                return axios.put<E>(`${Config.baseUrl}api/${entityLower}/${entity.uuid}`, postEntity)
-                    .then(res => ({ result: res.data})); 
+                const url = `${Config.baseUrl}api/${entityLower}/${entity.uuid}`;
+                return axios.put<{}>(url, postEntity)
+                    .then(_ => axios.get<E>(url))
+                    .then(res => ({ result: res.data })); 
             }
             else {
-                return axios.post<E>(`${Config.baseUrl}api/${entityLower}/`, postEntity)
-                    .then(res => ({ result: res.data})); 
-            }   
+                return axios.post<{}>(`${Config.baseUrl}api/${entityLower}/`, postEntity)
+                    .then(res => res.headers["location"])
+                    .then(loc => axios.get<E>(loc))
+                    .then(res => ({ result: res.data })); 
+            }
         }
     );
     

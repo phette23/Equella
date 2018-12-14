@@ -64,11 +64,6 @@ public class CourseResourceImpl extends AbstractBaseEntityResource<CourseInfo, B
 	private CourseInfoService courseService;
 	@Inject
 	private CourseBeanSerializer courseSerializer;
-	@Inject
-	private TLEAclManager aclService;
-
-	private static String KEY_PFX = AbstractPluginService.getMyPluginId(CourseResource.class)+".";
-
 
 	/**
 	 * Provide the full course data in the results
@@ -102,7 +97,7 @@ public class CourseResourceImpl extends AbstractBaseEntityResource<CourseInfo, B
 			if( courseSameCode != null && (isNew || !uuid.equals(courseSameCode.getUuid())) )
 			{
 				throw new InvalidDataException(new ValidationError("code",
-					CurrentLocale.get(KEY_PFX + "course.edit.validation.codeinuse", courseCode)));
+					getString("course.edit.validation.codeinuse", courseCode)));
 			}
 		}
 	}
