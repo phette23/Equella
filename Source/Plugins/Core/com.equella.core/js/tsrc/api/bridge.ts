@@ -8,6 +8,7 @@ export interface Bridge {
         href: string;
         onClick: (e: React.MouseEvent<HTMLAnchorElement>) => void;
     },
+    forcePushRoute: (Route: Route) => void;
     Template: React.ComponentType<TemplateProps>
     AclEditor: React.ComponentType<AclEditorProps>
 }
