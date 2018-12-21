@@ -152,8 +152,14 @@ class EditCourse extends React.Component<Props, EditCourseState> {
             errored: false,
             editing: this.props.uuid ? true : false
         };
-        if (this.props.uuid) {
-            this.props.loadEntity(this.props.uuid);
+        this.loadEntity(this.props.uuid);
+        this.props.loadCitations();
+        this.props.listPrivileges('COURSE_INFO');
+    }
+
+    loadEntity = (uuid?: string | null) => {
+        if (uuid) {
+            this.props.loadEntity(uuid);
         }
         else {
             this.props.modifyEntity({
@@ -164,8 +170,12 @@ class EditCourse extends React.Component<Props, EditCourseState> {
                 versionSelection: 'INSTITUTION_DEFAULT'
             });
         }
-        this.props.loadCitations();
-        this.props.listPrivileges('COURSE_INFO');
+    }
+
+    componentDidUpdate = (prevProps: Props) => {
+        if (prevProps.uuid !== this.props.uuid) {
+            this.loadEntity(this.props.uuid);
+        }
     }
 
     modifyEntity = (c: Partial<Course>) => {
@@ -178,7 +188,7 @@ class EditCourse extends React.Component<Props, EditCourseState> {
     handleSave() {
         if (this.props.entity) {
             const { versionSelection } = this.props.entity;
-            const { router, routes } = this.props.bridge;
+            const { routes } = this.props.bridge;
             const vs = (versionSelection === "DEFAULT" ? undefined : versionSelection);
 
             let course = {
@@ -195,17 +205,15 @@ class EditCourse extends React.Component<Props, EditCourseState> {
                         .then(editedCourse => {
                             // change the URL, but only if it's new
                             if (!thiss.props.uuid) {
-                                // FIXME: remove the unload event listener
-                                //window.removeEventListener('beforeunload');
                                 const uuid = editedCourse.result.uuid;
-                                const courseEditRoute = router(routes.CourseEdit(uuid));
-                                window.location.href = courseEditRoute.href;
+                                thiss.props.bridge.forcePushRoute(routes.CourseEdit(uuid));
                             }
-                            else {
-                                thiss.setState({ changed: false, justSaved: true });
-                            }
+                            thiss.setState({ changed: false, justSaved: true });
                         })
-                        .catch(r => thiss.setState({ errored: true }))
+                        .catch(r => {
+                            console.error(r);
+                            thiss.setState({ errored: true });
+                        })
                 }
                 else {
                     thiss.setState({ activeTab: 0 })
